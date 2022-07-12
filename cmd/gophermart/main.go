@@ -45,7 +45,7 @@ func main() {
 	osSigChan := make(chan os.Signal, 1)
 	signal.Notify(osSigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	var repository storage.Database
+	var repository *storage.Database
 
 	// Инициализируем подключение к базе данных
 	var err error
@@ -66,11 +66,11 @@ func main() {
 		os.Exit(0)
 	}()
 
-	repository = *storage.NewDatabase(dbpool)
+	repository = storage.NewDatabase(dbpool)
 
 	log.Debug().Msg("Starting server...")
 
-	srv := server.New(repository, dbpool, tokenAuth)
+	srv := server.New(*repository, dbpool, tokenAuth)
 	srv.MountHandlers()
 
 	http.ListenAndServe(cfg.RunAddress, srv.Router)
