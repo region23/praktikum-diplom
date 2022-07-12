@@ -43,6 +43,12 @@ func (s *Server) MountHandlers() {
 	// processing should be stopped.
 	s.Router.Use(middleware.Timeout(60 * time.Second))
 
+	// Public routes
+	s.Router.Group(func(r chi.Router) {
+		r.Post("/api/user/register", s.userRegister)
+		r.Post("/api/user/login", s.userLogin)
+	})
+
 	s.Router.Group(func(r chi.Router) {
 		// Seek, verify and validate JWT tokens
 		r.Use(jwtauth.Verifier(s.TokenAuth))
@@ -58,12 +64,6 @@ func (s *Server) MountHandlers() {
 		r.Get("/api/user/balance", s.getUserBalance)
 		r.Post("/api/user/balance/withdraw", s.userBalanceWithdraw)
 		r.Get("/api/user/balance/withdrawals", s.userBalanceWithdrawals)
-	})
-
-	// Public routes
-	s.Router.Group(func(r chi.Router) {
-		r.Post("/api/user/register", s.userRegister)
-		r.Post("/api/user/login", s.userLogin)
 	})
 }
 
