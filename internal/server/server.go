@@ -158,7 +158,7 @@ type ResponseBody struct {
 	Error   string `json:"error,omitempty"`
 }
 
-func JSONResponse(w http.ResponseWriter, responseStruct any, code int) {
+func JSONResponse(w http.ResponseWriter, responseStruct interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
