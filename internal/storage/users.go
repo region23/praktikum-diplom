@@ -64,8 +64,7 @@ func (storage *Database) GetUser(login string) (*User, error) {
 // добавляет пользователя в базу
 func (storage *Database) AddUser(user *User) error {
 	_, err := storage.dbpool.Exec(context.Background(),
-		`INSERT INTO users (id, login, password) VALUES ($1, $2, $3);`,
-		user.ID,
+		`INSERT INTO users (login, password) VALUES ($1, $2);`,
 		user.Login,
 		user.Password)
 

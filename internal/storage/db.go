@@ -43,9 +43,9 @@ func Ping(dbpool *pgxpool.Pool) error {
 // Если её нет, то создать.
 func InitDB(dbpool *pgxpool.Pool) error {
 	query := `CREATE TABLE IF NOT EXISTS users (
-		ID SERIAL PRIMARY KEY NOT NULL,
-		login VARCHAR(100) UNIQUE NOT NULL,
-		password VARCHAR(64) NOT NULL,
+		id SERIAL PRIMARY KEY,
+		login VARCHAR(100) NOT NULL UNIQUE,
+		password CHAR(64) NOT NULL
 	  );`
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)

@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/region23/praktikum-diplom/internal/storage"
+	"github.com/rs/zerolog/log"
 )
 
 type Server struct {
@@ -109,9 +110,9 @@ func (s *Server) userRegister(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, tokenString, _ := s.TokenAuth.Encode(map[string]interface{}{"user_id": user.Login})
+		log.Debug().Msg(tokenString)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Authorization", fmt.Sprintf("BEARER %v", tokenString))
 
 		cookie := &http.Cookie{
@@ -120,6 +121,8 @@ func (s *Server) userRegister(w http.ResponseWriter, r *http.Request) {
 			MaxAge: 3600,
 		}
 		http.SetCookie(w, cookie)
+
+		w.WriteHeader(http.StatusOK)
 
 		json.NewEncoder(w).Encode(nil)
 	}
