@@ -15,10 +15,17 @@ type User struct {
 }
 
 // проверяем, есть ли пользователь с таким логином в базе
-func (storage *Database) UserExist(login string) (bool, error) {
-	row := storage.dbpool.QueryRow(context.Background(),
-		`SELECT count(*) FROM users WHERE login = $1`,
-		login)
+func (storage *Database) UserExist(login, hashedPassword string) (bool, error) {
+	var row pgx.Row
+	if hashedPassword != "" {
+		row = storage.dbpool.QueryRow(context.Background(),
+			`SELECT count(*) FROM users WHERE login = $1 AND password = $2`,
+			login, hashedPassword)
+	} else {
+		row = storage.dbpool.QueryRow(context.Background(),
+			`SELECT count(*) FROM users WHERE login = $1`,
+			login)
+	}
 
 	var userCount int
 

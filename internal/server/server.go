@@ -88,7 +88,7 @@ func (s *Server) userRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// проверить, есть ли такой логин в базе. Если есть возвращаем 409
-	userExist, err := s.storage.UserExist(user.Login)
+	userExist, err := s.storage.UserExist(user.Login, "")
 
 	if err != nil {
 		respBody := ResponseBody{Error: fmt.Sprintf("Ошибка при получении пользователя: %v", err.Error())}
@@ -136,8 +136,50 @@ func (s *Server) userLogin(w http.ResponseWriter, r *http.Request) {
 	// 401 — неверная пара логин/пароль;
 	// 500 — внутренняя ошибка сервера.
 
+	// декодировать логин и пароль, переданные в json
+	var user storage.User
+
+	// decode input or return error
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprint("Decode error! please check your JSON formating.", err.Error())}
+		JSONResponse(w, respBody, http.StatusBadRequest)
+		return
+	}
+
 	// Хэшируем пароль и проверяем в базе пару ключ/хэш пароля. Если ок 200 и jwt-токен
-	// Если неверная пара логин/пароль то 401
+	hashedPassword := fmt.Sprintf("%x", sha256.Sum256([]byte(user.Password)))
+	user.Password = hashedPassword
+	userExist, err := s.storage.UserExist(user.Login, user.Password)
+
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("Ошибка при получении пользователя: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	if userExist {
+		_, tokenString, _ := s.TokenAuth.Encode(map[string]interface{}{"user_id": user.Login})
+		log.Debug().Msg(tokenString)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Authorization", fmt.Sprintf("BEARER %v", tokenString))
+
+		cookie := &http.Cookie{
+			Name:   "jwt",
+			Value:  tokenString,
+			MaxAge: 3600,
+		}
+		http.SetCookie(w, cookie)
+
+		w.WriteHeader(http.StatusOK)
+
+		json.NewEncoder(w).Encode(nil)
+
+	} else {
+		respBody := ResponseBody{Error: "неверная пара логин/пароль"}
+		JSONResponse(w, respBody, http.StatusUnauthorized)
+	}
 
 }
 
