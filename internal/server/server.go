@@ -102,33 +102,35 @@ func (s *Server) userRegister(w http.ResponseWriter, r *http.Request) {
 	if userExist {
 		respBody := ResponseBody{Error: "логин уже занят"}
 		JSONResponse(w, respBody, http.StatusConflict)
-	} else {
-		// хэшируем пароль
-		hashedPassword := fmt.Sprintf("%x", sha256.Sum256([]byte(user.Password)))
-		user.Password = hashedPassword
-		// если нет, добавляем в базу и возвращаем 200 и jwt-token
-		err = s.storage.AddUser(&user)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Ошибка при получении пользователя: %v", err.Error()), http.StatusInternalServerError)
-			return
-		}
-		_, tokenString, _ := s.TokenAuth.Encode(map[string]interface{}{"user_id": user.Login})
-		log.Debug().Msg(tokenString)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Authorization", fmt.Sprintf("BEARER %v", tokenString))
-
-		cookie := &http.Cookie{
-			Name:   "jwt",
-			Value:  tokenString,
-			MaxAge: 3600,
-		}
-		http.SetCookie(w, cookie)
-
-		w.WriteHeader(http.StatusOK)
-
-		json.NewEncoder(w).Encode(nil)
+		return
 	}
+
+	// хэшируем пароль и регистрируем пользователя
+	hashedPassword := fmt.Sprintf("%x", sha256.Sum256([]byte(user.Password)))
+	user.Password = hashedPassword
+	// если нет, добавляем в базу и возвращаем 200 и jwt-token
+	err = s.storage.AddUser(&user)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка при получении пользователя: %v", err.Error()), http.StatusInternalServerError)
+		return
+	}
+	_, tokenString, _ := s.TokenAuth.Encode(map[string]interface{}{"user_id": user.Login})
+	log.Debug().Msg(tokenString)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Authorization", fmt.Sprintf("BEARER %v", tokenString))
+
+	cookie := &http.Cookie{
+		Name:   "jwt",
+		Value:  tokenString,
+		MaxAge: 3600,
+	}
+	http.SetCookie(w, cookie)
+
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(nil)
+
 }
 
 // аутентификация пользователя
@@ -161,29 +163,28 @@ func (s *Server) userLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userExist {
-		_, tokenString, _ := s.TokenAuth.Encode(map[string]interface{}{"user_id": user.Login})
-		log.Debug().Msg(tokenString)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Authorization", fmt.Sprintf("BEARER %v", tokenString))
-
-		cookie := &http.Cookie{
-			Name:   "jwt",
-			Value:  tokenString,
-			MaxAge: 3600,
-		}
-		http.SetCookie(w, cookie)
-
-		w.WriteHeader(http.StatusOK)
-
-		json.NewEncoder(w).Encode(nil)
-
-	} else {
+	if !userExist {
 		respBody := ResponseBody{Error: "неверная пара логин/пароль"}
 		JSONResponse(w, respBody, http.StatusUnauthorized)
+		return
 	}
 
+	_, tokenString, _ := s.TokenAuth.Encode(map[string]interface{}{"user_id": user.Login})
+	log.Debug().Msg(tokenString)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Authorization", fmt.Sprintf("BEARER %v", tokenString))
+
+	cookie := &http.Cookie{
+		Name:   "jwt",
+		Value:  tokenString,
+		MaxAge: 3600,
+	}
+	http.SetCookie(w, cookie)
+
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(nil)
 }
 
 // загрузка пользователем номера заказа для расчёта
@@ -216,45 +217,45 @@ func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
 
 	valid := luhn.Valid(string(orderNumber))
 
-	if valid {
-		// смотрим, есть ли такой номер заказа уже в базе и смотрим добавлен он текущим пользователем или другим
-		// и возвращаем соответствующую ошибку
-		order, err := s.storage.GetOrder(string(orderNumber))
+	if !valid {
+		respBody := ResponseBody{Error: "неверный формат номера заказа"}
+		JSONResponse(w, respBody, http.StatusUnprocessableEntity)
+		return
+	}
 
-		if err != nil && err != pgx.ErrNoRows {
-			respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+	// смотрим, есть ли такой номер заказа уже в базе и смотрим добавлен он текущим пользователем или другим
+	// и возвращаем соответствующую ошибку
+	order, err := s.storage.GetOrder(string(orderNumber))
+
+	if err != nil && err != pgx.ErrNoRows {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	// Такой номер заказа не найден - можно добавить новый
+	if err == pgx.ErrNoRows {
+		err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
+		if err != nil {
+			respBody := ResponseBody{Error: fmt.Sprintf("при загрузке заказа произошла ошибка: %v", err.Error())}
 			JSONResponse(w, respBody, http.StatusInternalServerError)
 			return
 		}
 
-		if order.Login == currentLogin {
-			respBody := ResponseBody{Success: "номер заказа уже был загружен этим пользователем"}
-			JSONResponse(w, respBody, http.StatusOK)
-			return
-		}
+		respBody := ResponseBody{Success: "новый номер заказа принят в обработку"}
+		JSONResponse(w, respBody, http.StatusAccepted)
+		return
+	}
 
-		if order.Login != currentLogin {
-			respBody := ResponseBody{Error: "номер заказа уже был загружен другим пользователем"}
-			JSONResponse(w, respBody, http.StatusConflict)
-			return
-		}
+	if order.Login == currentLogin {
+		respBody := ResponseBody{Success: "номер заказа уже был загружен этим пользователем"}
+		JSONResponse(w, respBody, http.StatusOK)
+		return
+	}
 
-		// Такой номер заказа не найден - можно добавить новый
-		if err == pgx.ErrNoRows {
-			err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
-			if err != nil {
-				respBody := ResponseBody{Error: fmt.Sprintf("при загрузке заказа произошла ошибка: %v", err.Error())}
-				JSONResponse(w, respBody, http.StatusInternalServerError)
-				return
-			}
-
-			respBody := ResponseBody{Success: "новый номер заказа принят в обработку"}
-			JSONResponse(w, respBody, http.StatusAccepted)
-			return
-		}
-	} else {
-		respBody := ResponseBody{Error: "неверный формат номера заказа"}
-		JSONResponse(w, respBody, http.StatusUnprocessableEntity)
+	if order.Login != currentLogin {
+		respBody := ResponseBody{Error: "номер заказа уже был загружен другим пользователем"}
+		JSONResponse(w, respBody, http.StatusConflict)
 		return
 	}
 }
