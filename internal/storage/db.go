@@ -46,7 +46,16 @@ func InitDB(dbpool *pgxpool.Pool) error {
 		id SERIAL PRIMARY KEY,
 		login VARCHAR(100) NOT NULL UNIQUE,
 		password CHAR(64) NOT NULL
-	  );`
+	  );
+	  
+	  CREATE TABLE IF NOT EXISTS orders (
+		number VARCHAR(100) PRIMARY KEY,
+		login VARCHAR(100) NOT NULL,
+		status VARCHAR(20) NOT NULL,
+		accrual INT,
+		uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	  );
+	  `
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelfunc()

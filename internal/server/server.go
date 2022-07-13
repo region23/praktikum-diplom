@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -11,7 +12,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/joeljunstrom/go-luhn"
 	"github.com/region23/praktikum-diplom/internal/storage"
 	"github.com/rs/zerolog/log"
 )
@@ -184,7 +187,77 @@ func (s *Server) userLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // загрузка пользователем номера заказа для расчёта
-func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {}
+func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
+	// Возможные коды ответа:
+	// 200 — номер заказа уже был загружен этим пользователем;
+	// 202 — новый номер заказа принят в обработку;
+	// 400 — неверный формат запроса;
+	// 401 — пользователь не аутентифицирован;
+	// 409 — номер заказа уже был загружен другим пользователем;
+	// 422 — неверный формат номера заказа;
+	// 500 — внутренняя ошибка сервера.
+
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	currentLogin, _ := claims["user_id"].(string)
+
+	// проверить номер заказ алгоритмом Луна
+	orderNumber, err := io.ReadAll(r.Body)
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("неверный формат запроса: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusBadRequest)
+		return
+	}
+
+	valid := luhn.Valid(string(orderNumber))
+
+	if valid {
+		// смотрим, есть ли такой номер заказа уже в базе и смотрим добавлен он текущим пользователем или другим
+		// и возвращаем соответствующую ошибку
+		order, err := s.storage.GetOrder(string(orderNumber))
+
+		if err != nil && err != pgx.ErrNoRows {
+			respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+			JSONResponse(w, respBody, http.StatusInternalServerError)
+			return
+		}
+
+		if order.Login == currentLogin {
+			respBody := ResponseBody{Success: "номер заказа уже был загружен этим пользователем"}
+			JSONResponse(w, respBody, http.StatusOK)
+			return
+		}
+
+		if order.Login != currentLogin {
+			respBody := ResponseBody{Error: "номер заказа уже был загружен другим пользователем"}
+			JSONResponse(w, respBody, http.StatusConflict)
+			return
+		}
+
+		// Такой номер заказа не найден - можно добавить новый
+		if err == pgx.ErrNoRows {
+			err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
+			if err != nil {
+				respBody := ResponseBody{Error: fmt.Sprintf("при загрузке заказа произошла ошибка: %v", err.Error())}
+				JSONResponse(w, respBody, http.StatusInternalServerError)
+				return
+			}
+
+			respBody := ResponseBody{Success: "новый номер заказа принят в обработку"}
+			JSONResponse(w, respBody, http.StatusAccepted)
+			return
+		}
+	} else {
+		respBody := ResponseBody{Error: "неверный формат номера заказа"}
+		JSONResponse(w, respBody, http.StatusUnprocessableEntity)
+		return
+	}
+}
 
 // получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях
 func (s *Server) getUserOrders(w http.ResponseWriter, r *http.Request) {}
