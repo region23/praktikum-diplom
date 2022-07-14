@@ -261,7 +261,33 @@ func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 // получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях
-func (s *Server) getUserOrders(w http.ResponseWriter, r *http.Request) {}
+func (s *Server) getUserOrders(w http.ResponseWriter, r *http.Request) {
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	currentLogin, _ := claims["user_id"].(string)
+
+	orders, err := s.storage.GetOrders(currentLogin)
+
+	if err != nil && err != pgx.ErrNoRows {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	// У пользователя нет заказов
+	if err == pgx.ErrNoRows {
+		respBody := ResponseBody{Success: "нет данных для ответа"}
+		JSONResponse(w, respBody, http.StatusNoContent)
+		return
+	}
+
+	JSONResponse(w, orders, http.StatusOK)
+}
 
 // получение текущего баланса счёта баллов лояльности пользователя
 func (s *Server) getUserBalance(w http.ResponseWriter, r *http.Request) {}
