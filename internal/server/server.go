@@ -290,13 +290,101 @@ func (s *Server) getUserOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 // получение текущего баланса счёта баллов лояльности пользователя
-func (s *Server) getUserBalance(w http.ResponseWriter, r *http.Request) {}
+func (s *Server) getUserBalance(w http.ResponseWriter, r *http.Request) {
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	currentLogin, _ := claims["user_id"].(string)
+
+	balance, err := s.storage.CurrentBalance(currentLogin)
+
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	JSONResponse(w, balance, http.StatusOK)
+}
 
 // запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа
-func (s *Server) userBalanceWithdraw(w http.ResponseWriter, r *http.Request) {}
+func (s *Server) userBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	currentLogin, _ := claims["user_id"].(string)
+
+	var withdraw storage.Withdraw
+	// decode input or return error
+	err = json.NewDecoder(r.Body).Decode(&withdraw)
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprint("Decode error! please check your JSON formating.", err.Error())}
+		JSONResponse(w, respBody, http.StatusBadRequest)
+		return
+	}
+
+	valid := luhn.Valid(string(withdraw.Order))
+
+	if !valid {
+		respBody := ResponseBody{Error: "неверный формат номера заказа"}
+		JSONResponse(w, respBody, http.StatusUnprocessableEntity)
+		return
+	}
+
+	err = s.storage.AddWithdraw(withdraw.Order, currentLogin, withdraw.Sum)
+
+	if err != nil {
+		if err == storage.ErrInsufficientBalance {
+			respBody := ResponseBody{Error: err.Error()}
+			JSONResponse(w, respBody, http.StatusPaymentRequired)
+			return
+		}
+
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	respBody := ResponseBody{Success: "успешная обработка запроса"}
+	JSONResponse(w, respBody, http.StatusOK)
+}
 
 // получение информации о выводе средств с накопительного счёта пользователем
-func (s *Server) userBalanceWithdrawals(w http.ResponseWriter, r *http.Request) {}
+func (s *Server) userBalanceWithdrawals(w http.ResponseWriter, r *http.Request) {
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	currentLogin, _ := claims["user_id"].(string)
+
+	withdrawals, err := s.storage.GetWithdrawals(currentLogin)
+
+	if err != nil {
+		// У пользователя нет ни одного списания
+		if err == pgx.ErrNoRows {
+			respBody := ResponseBody{Success: "нет ни одного списания"}
+			JSONResponse(w, respBody, http.StatusNoContent)
+			return
+		}
+
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+
+	JSONResponse(w, withdrawals, http.StatusOK)
+}
 
 type ResponseBody struct {
 	Success string `json:"success,omitempty"`

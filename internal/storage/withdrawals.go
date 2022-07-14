@@ -9,7 +9,7 @@ import (
 
 type Withdraw struct {
 	Order       string    `json:"order"`        // номер заказа
-	Sum         int       `json:"sum"`          // сумма списания в счет заказа 1 бал = 1 рубль (в копейках)
+	Sum         float64   `json:"sum"`          // сумма списания в счет заказа 1 бал = 1 рубль (в копейках)
 	ProcessedAt time.Time `json:"processed_at"` // время списания
 }
 
@@ -37,16 +37,16 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 		`SELECT SUM(sum) FROM withdrawals WHERE login = $1`,
 		login)
 
-	var withdrawn int
+	var withdrawn float64
 
 	err = row2.Scan(&withdrawn)
 	if err != nil {
 		return nil, err
 	}
 
-	current := float64(totalaccruals*100-withdrawn) / 100
+	current := float64(totalaccruals) - withdrawn
 
-	balance := Balance{Current: current, Withdrawn: float64(withdrawn)}
+	balance := Balance{Current: current, Withdrawn: withdrawn}
 
 	return &balance, nil
 }
@@ -71,7 +71,7 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 		`INSERT INTO withdrawals (order, login, sum) VALUES ($1, $2, $3);`,
 		orderNumber,
 		login,
-		sum*100)
+		sum)
 
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to INSERT withdraw to DB")
