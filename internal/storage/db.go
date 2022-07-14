@@ -58,19 +58,18 @@ func InitDB(dbpool *pgxpool.Pool) error {
 	  );
 
 	  CREATE TABLE IF NOT EXISTS withdrawals (
-		order VARCHAR(100) PRIMARY KEY,
+		order_number VARCHAR(100) PRIMARY KEY,
 		login VARCHAR(100) NOT NULL,
-		sum INT NOT NULL,
+		sum NUMERIC NOT NULL,
 		processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-	  );
-	  `
+	  );`
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelfunc()
 
 	_, err := dbpool.Exec(ctx, query)
 	if err != nil {
-		log.Error().Err(err).Msg("Error when creating product table")
+		log.Error().Err(err).Msg("Error when creating tables")
 		return err
 	}
 

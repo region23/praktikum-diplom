@@ -68,7 +68,7 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 
 	// если баланса хватает для текущего списания - делаем списание
 	_, err = storage.dbpool.Exec(context.Background(),
-		`INSERT INTO withdrawals (order, login, sum) VALUES ($1, $2, $3);`,
+		`INSERT INTO withdrawals (order_number, login, sum) VALUES ($1, $2, $3);`,
 		orderNumber,
 		login,
 		sum)
@@ -83,7 +83,7 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 
 func (storage *Database) GetWithdrawals(login string) (*[]Withdraw, error) {
 	rows, err := storage.dbpool.Query(context.Background(),
-		`SELECT order, sum, processed_at FROM withdrawals WHERE login = $1 ORDER BY processed_at ASC`,
+		`SELECT order_number, sum, processed_at FROM withdrawals WHERE login = $1 ORDER BY processed_at ASC`,
 		login)
 
 	if err != nil {

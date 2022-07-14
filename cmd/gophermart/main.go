@@ -42,8 +42,6 @@ func main() {
 		log.Error().Err(err).Msgf("%+v\n", err)
 	}
 
-	log.Debug().Msg("адрес системы расчёта начислений" + cfg.AccrualSystemAddress)
-
 	osSigChan := make(chan os.Signal, 1)
 	signal.Notify(osSigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
