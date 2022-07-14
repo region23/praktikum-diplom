@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrAlreadyExists = errors.New("already exists")
+	ErrNotFound            = errors.New("not found")
+	ErrAlreadyExists       = errors.New("already exists")
+	ErrInsufficientBalance = errors.New("сумма списания больше текущей суммы")
 )
 
 type Database struct {
@@ -55,6 +56,13 @@ func InitDB(dbpool *pgxpool.Pool) error {
 		accrual INT DEFAULT 0,
 		uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	  );
+
+	  CREATE TABLE IF NOT EXISTS withdrawals (
+		order VARCHAR(100) PRIMARY KEY,
+		login VARCHAR(100) NOT NULL,
+		sum INT NOT NULL,
+		processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	  );
 	  `
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
@@ -66,7 +74,5 @@ func InitDB(dbpool *pgxpool.Pool) error {
 		return err
 	}
 
-	//rows := res.RowsAffected()
-	//log.Printf("Rows affected when creating table: %d", rows)
 	return nil
 }
