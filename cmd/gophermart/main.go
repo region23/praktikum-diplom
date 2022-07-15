@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/jwtauth/v5"
@@ -70,7 +71,8 @@ func main() {
 			default:
 				err = externalapi.UpdateAccurals(repository, cfg.AccrualSystemAddress)
 				if err != nil {
-					log.Fatal().Err(err).Msg("При доступе к внешнему сервису произошла ошибка")
+					log.Debug().Err(err).Msg("При доступе к внешнему сервису произошла ошибка")
+					time.Sleep(1 * time.Second)
 				}
 			}
 		}
