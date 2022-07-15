@@ -33,7 +33,7 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 	// отправляем запрос
 	response, err := client.Do(request)
 	if err != nil {
-		log.Debug().Err(err).Msg("Ошибка при обращении к удаленному апи")
+		log.Info().Err(err).Msg("Ошибка при обращении к удаленному апи")
 		return nil, 0, err
 	}
 
@@ -87,7 +87,7 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
 
 		if err != nil && retryAfter > 0 {
-			log.Debug().Err(err).Msg("Retry After: " + fmt.Sprint(retryAfter))
+			log.Info().Err(err).Msg("Retry After: " + fmt.Sprint(retryAfter))
 			sleep = time.Duration(retryAfter) * time.Second
 			continue
 		}
@@ -97,7 +97,7 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		}
 
 		// обновляем данные по заказу в orders
-		log.Debug().Msgf("Accural: %v", accural)
+		log.Info().Msgf("Accural: %v", accural)
 		err = storage.UpdateOrder(accural.Order, accural.Status, accural.Accrual)
 		if err != nil {
 			return err

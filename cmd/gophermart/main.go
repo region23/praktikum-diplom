@@ -68,6 +68,7 @@ func main() {
 			case <-osSigChan:
 				os.Exit(0)
 			default:
+				log.Info().Msg("Зашли в блок обновления")
 				externalapi.UpdateAccurals(repository, cfg.AccrualSystemAddress)
 			}
 		}
