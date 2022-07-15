@@ -32,6 +32,7 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 	// отправляем запрос
 	response, err := client.Do(request)
 	if err != nil {
+		fmt.Println(err)
 		return nil, 0, err
 	}
 
