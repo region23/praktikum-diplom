@@ -11,6 +11,7 @@ import (
 	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
+	externalapi "github.com/region23/praktikum-diplom/internal/external_api"
 	"github.com/region23/praktikum-diplom/internal/server"
 	"github.com/region23/praktikum-diplom/internal/storage"
 	"github.com/rs/zerolog/log"
@@ -62,8 +63,14 @@ func main() {
 	defer dbpool.Close()
 
 	go func() {
-		<-osSigChan
-		os.Exit(0)
+		for {
+			select {
+			case <-osSigChan:
+				os.Exit(0)
+			default:
+				externalapi.UpdateAccurals(repository, cfg.AccrualSystemAddress)
+			}
+		}
 	}()
 
 	repository = storage.NewDatabase(dbpool)

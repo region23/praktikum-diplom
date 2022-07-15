@@ -14,6 +14,7 @@ var (
 	ErrNotFound            = errors.New("not found")
 	ErrAlreadyExists       = errors.New("already exists")
 	ErrInsufficientBalance = errors.New("сумма списания больше текущей суммы")
+	ErrInternalServerError = errors.New("InternalServerError")
 )
 
 type Database struct {

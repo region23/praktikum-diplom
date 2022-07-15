@@ -33,6 +33,21 @@ func (storage *Database) AddOrder(orderNumber, login, status string) error {
 	return nil
 }
 
+func (storage *Database) UpdateOrder(orderNumber string, status string, accrual int) error {
+	_, err := storage.dbpool.Exec(context.Background(),
+		`UPDATE orders SET status = $1, accrual = $2 WHERE number = $3;`,
+		status,
+		accrual,
+		orderNumber)
+
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to UPDATE order in DB")
+		return err
+	}
+
+	return nil
+}
+
 // извлекает заказ из базы
 func (storage *Database) GetOrder(orderNumber string) (*Order, error) {
 	row := storage.dbpool.QueryRow(context.Background(),
@@ -58,6 +73,29 @@ func (storage *Database) GetOrders(login string) (*[]Order, error) {
 	rows, err := storage.dbpool.Query(context.Background(),
 		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE login = $1 ORDER BY uploaded_at ASC`,
 		login)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var orders []Order
+
+	for rows.Next() {
+		var order Order
+		err := rows.Scan(&order.Number, &order.Login, &order.Status, &order.Accrual, &order.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return &orders, rows.Err()
+}
+
+// извлекает все заказы всех пользователей из базы, требующие обновление статуса и начислений
+func (storage *Database) GetOrdersForUpdate() (*[]Order, error) {
+	rows, err := storage.dbpool.Query(context.Background(),
+		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE status IN ("NEW", "REGISTERED", "PROCESSING") ORDER BY uploaded_at ASC`)
 
 	if err != nil {
 		return nil, err
