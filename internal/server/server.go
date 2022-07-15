@@ -274,16 +274,16 @@ func (s *Server) getUserOrders(w http.ResponseWriter, r *http.Request) {
 
 	orders, err := s.storage.GetOrders(currentLogin)
 
-	if err != nil && err != pgx.ErrNoRows {
-		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
-		JSONResponse(w, respBody, http.StatusInternalServerError)
+	// У пользователя нет заказов
+	if err == pgx.ErrNoRows || len(*orders) == 0 {
+		respBody := ResponseBody{Success: "нет данных для ответа"}
+		JSONResponse(w, respBody, http.StatusNoContent)
 		return
 	}
 
-	// У пользователя нет заказов
-	if err == pgx.ErrNoRows {
-		respBody := ResponseBody{Success: "нет данных для ответа"}
-		JSONResponse(w, respBody, http.StatusNoContent)
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
 		return
 	}
 
