@@ -228,12 +228,6 @@ func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
 	// и возвращаем соответствующую ошибку
 	order, err := s.storage.GetOrder(string(orderNumber))
 
-	if err != nil && err != pgx.ErrNoRows {
-		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
-		JSONResponse(w, respBody, http.StatusInternalServerError)
-		return
-	}
-
 	// Такой номер заказа не найден - можно добавить новый
 	if err == pgx.ErrNoRows {
 		err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
@@ -245,6 +239,12 @@ func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
 
 		respBody := ResponseBody{Success: "новый номер заказа принят в обработку"}
 		JSONResponse(w, respBody, http.StatusAccepted)
+		return
+	}
+
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
 		return
 	}
 
