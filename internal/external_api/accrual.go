@@ -65,7 +65,13 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 		return nil, 0, storage.ErrInternalServerError
 	}
 
-	return nil, 0, errors.New("странно, мы не должны были здесь оказаться")
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return nil, 0, errors.New(string(body))
+
 }
 
 // Обновлений начислений и статусов начислений по заказам
