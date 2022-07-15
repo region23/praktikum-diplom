@@ -95,7 +95,7 @@ func (storage *Database) GetOrders(login string) (*[]Order, error) {
 // извлекает все заказы всех пользователей из базы, требующие обновление статуса и начислений
 func (storage *Database) GetOrdersForUpdate() (*[]Order, error) {
 	rows, err := storage.dbpool.Query(context.Background(),
-		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE status IN ("NEW", "REGISTERED", "PROCESSING") ORDER BY uploaded_at ASC`)
+		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE status IN ('NEW', 'REGISTERED', 'PROCESSING') ORDER BY uploaded_at ASC`)
 
 	if err != nil {
 		return nil, err

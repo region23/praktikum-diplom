@@ -22,7 +22,7 @@ type Balance struct {
 func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	// получить общее количество баллов лояльности, накопленных за весь период
 	row := storage.dbpool.QueryRow(context.Background(),
-		`SELECT SUM(accrual) FROM orders WHERE login = $1 AND status = "PROCESSED"`,
+		`SELECT SUM(accrual) FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
 		login)
 
 	var totalaccruals int
