@@ -79,7 +79,9 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		return err
 	}
 
-	log.Info().Msg("Всего записей с заказами: " + fmt.Sprint(len(*orders)))
+	if len(*orders) > 5 {
+		log.Info().Msg("Всего записей с заказами: " + fmt.Sprint(len(*orders)))
+	}
 
 	sleep := 1 * time.Nanosecond
 	// проходим в цикле по списку и получаем из удаленного сервиса обновления
