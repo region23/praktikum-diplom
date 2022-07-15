@@ -3,9 +3,9 @@ package externalapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -20,13 +20,10 @@ type AccuralType struct {
 
 // получение информации о расчёте начислений баллов лояльности
 func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralType, retryAfter int, err error) {
-	u := url.URL{
-		Scheme: "http",
-		Host:   accrualSystemAddress,
-		Path:   "/api/orders/" + number,
-	}
+	url := accrualSystemAddress + "/api/orders/" + number
+	fmt.Println(url)
 
-	request, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	request, err := http.NewRequest(http.MethodGet, url, nil)
 	request.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return nil, 0, err
