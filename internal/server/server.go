@@ -206,59 +206,65 @@ func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentLogin, _ := claims["user_id"].(string)
+	currentLogin, ok := claims["user_id"].(string)
 
-	// проверить номер заказ алгоритмом Луна
-	orderNumber, err := io.ReadAll(r.Body)
-	if err != nil {
-		respBody := ResponseBody{Error: fmt.Sprintf("неверный формат запроса: %v", err.Error())}
-		JSONResponse(w, respBody, http.StatusBadRequest)
-		return
-	}
+	if ok {
 
-	valid := luhn.Valid(string(orderNumber))
-
-	if !valid {
-		respBody := ResponseBody{Error: "неверный формат номера заказа"}
-		JSONResponse(w, respBody, http.StatusUnprocessableEntity)
-		return
-	}
-
-	// смотрим, есть ли такой номер заказа уже в базе и смотрим добавлен он текущим пользователем или другим
-	// и возвращаем соответствующую ошибку
-	order, err := s.storage.GetOrder(string(orderNumber))
-
-	// Такой номер заказа не найден - можно добавить новый
-	if err == pgx.ErrNoRows {
-		err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
+		// проверить номер заказ алгоритмом Луна
+		orderNumber, err := io.ReadAll(r.Body)
 		if err != nil {
-			respBody := ResponseBody{Error: fmt.Sprintf("при загрузке заказа произошла ошибка: %v", err.Error())}
+			respBody := ResponseBody{Error: fmt.Sprintf("неверный формат запроса: %v", err.Error())}
+			JSONResponse(w, respBody, http.StatusBadRequest)
+			return
+		}
+
+		valid := luhn.Valid(string(orderNumber))
+
+		if !valid {
+			respBody := ResponseBody{Error: "неверный формат номера заказа"}
+			JSONResponse(w, respBody, http.StatusUnprocessableEntity)
+			return
+		}
+
+		// смотрим, есть ли такой номер заказа уже в базе и смотрим добавлен он текущим пользователем или другим
+		// и возвращаем соответствующую ошибку
+		order, err := s.storage.GetOrder(string(orderNumber))
+
+		// Такой номер заказа не найден - можно добавить новый
+		if err == pgx.ErrNoRows {
+			err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
+			if err != nil {
+				respBody := ResponseBody{Error: fmt.Sprintf("при загрузке заказа произошла ошибка: %v", err.Error())}
+				JSONResponse(w, respBody, http.StatusInternalServerError)
+				return
+			}
+
+			respBody := ResponseBody{Success: "новый номер заказа принят в обработку"}
+			JSONResponse(w, respBody, http.StatusAccepted)
+			return
+		}
+
+		if err != nil {
+			respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
 			JSONResponse(w, respBody, http.StatusInternalServerError)
 			return
 		}
 
-		respBody := ResponseBody{Success: "новый номер заказа принят в обработку"}
-		JSONResponse(w, respBody, http.StatusAccepted)
-		return
+		if order.Login == currentLogin {
+			respBody := ResponseBody{Success: "номер заказа уже был загружен этим пользователем"}
+			JSONResponse(w, respBody, http.StatusOK)
+			return
+		}
+
+		if order.Login != currentLogin {
+			respBody := ResponseBody{Error: "номер заказа уже был загружен другим пользователем"}
+			JSONResponse(w, respBody, http.StatusConflict)
+			return
+		}
 	}
 
-	if err != nil {
-		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
-		JSONResponse(w, respBody, http.StatusInternalServerError)
-		return
-	}
-
-	if order.Login == currentLogin {
-		respBody := ResponseBody{Success: "номер заказа уже был загружен этим пользователем"}
-		JSONResponse(w, respBody, http.StatusOK)
-		return
-	}
-
-	if order.Login != currentLogin {
-		respBody := ResponseBody{Error: "номер заказа уже был загружен другим пользователем"}
-		JSONResponse(w, respBody, http.StatusConflict)
-		return
-	}
+	respBody := ResponseBody{Error: "внутренняя ошибка сервера: не передан логин пользователя"}
+	JSONResponse(w, respBody, http.StatusInternalServerError)
 }
 
 // получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях
