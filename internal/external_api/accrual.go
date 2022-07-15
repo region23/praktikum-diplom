@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/region23/praktikum-diplom/internal/storage"
+	"github.com/rs/zerolog/log"
 )
 
 type AccuralType struct {
@@ -32,7 +33,7 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 	// отправляем запрос
 	response, err := client.Do(request)
 	if err != nil {
-		fmt.Println(err)
+		log.Debug().Err(err).Msg("Ошибка при обращении к удаленному апи")
 		return nil, 0, err
 	}
 
@@ -86,7 +87,7 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
 
 		if err != nil && retryAfter > 0 {
-			fmt.Println("Retry After: " + fmt.Sprint(retryAfter))
+			log.Debug().Err(err).Msg("Retry After: " + fmt.Sprint(retryAfter))
 			sleep = time.Duration(retryAfter) * time.Second
 			continue
 		}
@@ -96,7 +97,7 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		}
 
 		// обновляем данные по заказу в orders
-		fmt.Println(accural)
+		log.Debug().Msgf("Accural: %v", accural)
 		err = storage.UpdateOrder(accural.Order, accural.Status, accural.Accrual)
 		if err != nil {
 			return err
