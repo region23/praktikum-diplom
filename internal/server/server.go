@@ -68,6 +68,7 @@ func (s *Server) MountHandlers() {
 		r.Get("/api/user/balance", s.getUserBalance)
 		r.Post("/api/user/balance/withdraw", s.userBalanceWithdraw)
 		r.Get("/api/user/balance/withdrawals", s.userBalanceWithdrawals)
+		r.Get("/api/user/withdrawals", s.userBalanceWithdrawals)
 	})
 }
 
