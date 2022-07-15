@@ -84,9 +84,8 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 
 		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
 
-		fmt.Println(accural)
-
 		if err != nil && retryAfter > 0 {
+			fmt.Println("Retry After: " + string(retryAfter))
 			sleep = time.Duration(retryAfter) * time.Second
 			continue
 		}
@@ -96,6 +95,7 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		}
 
 		// обновляем данные по заказу в orders
+		fmt.Println(accural)
 		err = storage.UpdateOrder(accural.Order, accural.Status, accural.Accrual)
 		if err != nil {
 			return err
