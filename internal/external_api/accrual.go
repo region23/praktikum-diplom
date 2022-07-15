@@ -28,7 +28,7 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 		return nil, 0, err
 	}
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 1 * time.Second}
 	// отправляем запрос
 	response, err := client.Do(request)
 	if err != nil {
