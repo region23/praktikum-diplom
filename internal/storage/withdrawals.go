@@ -25,7 +25,7 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 		`SELECT COALESCE(SUM(accrual), 0) as sum FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
 		login)
 
-	var totalaccruals int
+	var totalaccruals float64
 
 	err := row.Scan(&totalaccruals)
 	if err != nil {
@@ -44,7 +44,7 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 		return nil, err
 	}
 
-	current := float64(totalaccruals) - withdrawn
+	current := totalaccruals - withdrawn
 
 	balance := Balance{Current: current, Withdrawn: withdrawn}
 

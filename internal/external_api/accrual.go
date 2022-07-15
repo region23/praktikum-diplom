@@ -3,20 +3,18 @@ package externalapi
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/region23/praktikum-diplom/internal/storage"
-	"github.com/rs/zerolog/log"
 )
 
 type AccuralType struct {
-	Order   string `json:"order"`             // номер заказа
-	Status  string `json:"status"`            // статус расчёта начисления
-	Accrual int    `json:"accrual,omitempty"` // рассчитанные баллы к начислению, при отсутствии начисления — поле отсутствует в ответе
+	Order   string  `json:"order"`             // номер заказа
+	Status  string  `json:"status"`            // статус расчёта начисления
+	Accrual float64 `json:"accrual,omitempty"` // рассчитанные баллы к начислению, при отсутствии начисления — поле отсутствует в ответе
 }
 
 // получение информации о расчёте начислений баллов лояльности
@@ -33,7 +31,6 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 	// отправляем запрос
 	response, err := client.Do(request)
 	if err != nil {
-		log.Info().Err(err).Msg("Ошибка при обращении к удаленному апи")
 		return nil, 0, err
 	}
 
@@ -85,9 +82,7 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		time.Sleep(sleep)
 
 		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
-		log.Info().Err(err).Msg("Любые ошибки от внешнего сервиса")
 		if err != nil && retryAfter > 0 {
-			log.Info().Err(err).Msg("Retry After: " + fmt.Sprint(retryAfter))
 			sleep = time.Duration(retryAfter) * time.Second
 			continue
 		}
@@ -97,7 +92,6 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		}
 
 		// обновляем данные по заказу в orders
-		log.Info().Msgf("Accural: %v", accural)
 		err = storage.UpdateOrder(accural.Order, accural.Status, accural.Accrual)
 		if err != nil {
 			return err

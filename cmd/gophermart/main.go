@@ -68,7 +68,10 @@ func main() {
 			case <-osSigChan:
 				os.Exit(0)
 			default:
-				externalapi.UpdateAccurals(repository, cfg.AccrualSystemAddress)
+				err = externalapi.UpdateAccurals(repository, cfg.AccrualSystemAddress)
+				if err != nil {
+					log.Fatal().Err(err).Msg("При доступе к внешнему сервису произошла ошибка")
+				}
 			}
 		}
 	}()

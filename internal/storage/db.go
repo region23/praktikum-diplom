@@ -54,7 +54,7 @@ func InitDB(dbpool *pgxpool.Pool) error {
 		number VARCHAR(100) PRIMARY KEY,
 		login VARCHAR(100) NOT NULL,
 		status VARCHAR(20) NOT NULL,
-		accrual INT DEFAULT 0,
+		accrual NUMERIC DEFAULT 0,
 		uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	  );
 

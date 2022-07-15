@@ -13,7 +13,7 @@ type Order struct {
 	Number     string    `json:"number"`            // номер заказа
 	Login      string    `json:"login"`             // логин пользователя, оформившего заказ
 	Status     string    `json:"status"`            // статус обработки расчётов
-	Accrual    int       `json:"accrual,omitempty"` // количество начисленных за заказ баллов
+	Accrual    float64   `json:"accrual,omitempty"` // количество начисленных за заказ баллов
 	UploadedAt time.Time `json:"uploaded_at"`       // время загрузки
 }
 
@@ -33,7 +33,7 @@ func (storage *Database) AddOrder(orderNumber, login, status string) error {
 	return nil
 }
 
-func (storage *Database) UpdateOrder(orderNumber string, status string, accrual int) error {
+func (storage *Database) UpdateOrder(orderNumber string, status string, accrual float64) error {
 	_, err := storage.dbpool.Exec(context.Background(),
 		`UPDATE orders SET status = $1, accrual = $2 WHERE number = $3;`,
 		status,
