@@ -22,7 +22,7 @@ type Balance struct {
 func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	// получить общее количество баллов лояльности, накопленных за весь период
 	row := storage.dbpool.QueryRow(context.Background(),
-		`SELECT SUM(accrual) FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
+		`SELECT COALESCE(SUM(accrual), 0) as sum FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
 		login)
 
 	var totalaccruals int
@@ -34,7 +34,7 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 
 	// сумма использованных за весь период регистрации баллов
 	row2 := storage.dbpool.QueryRow(context.Background(),
-		`SELECT SUM(sum) FROM withdrawals WHERE login = $1`,
+		`SELECT COALESCE(SUM(sum), 0) as sum FROM withdrawals WHERE login = $1`,
 		login)
 
 	var withdrawn float64
