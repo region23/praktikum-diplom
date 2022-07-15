@@ -3,6 +3,7 @@ package externalapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -82,6 +83,8 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		time.Sleep(sleep)
 
 		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
+
+		fmt.Println(accural)
 
 		if err != nil && retryAfter > 0 {
 			sleep = time.Duration(retryAfter) * time.Second
