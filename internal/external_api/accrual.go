@@ -79,17 +79,13 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 		return err
 	}
 
-	if len(*orders) > 5 {
-		log.Info().Msg("Всего записей с заказами: " + fmt.Sprint(len(*orders)))
-	}
-
 	sleep := 1 * time.Nanosecond
 	// проходим в цикле по списку и получаем из удаленного сервиса обновления
 	for _, order := range *orders {
 		time.Sleep(sleep)
 
 		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
-
+		log.Info().Err(err).Msg("Любые ошибки от внешнего сервиса")
 		if err != nil && retryAfter > 0 {
 			log.Info().Err(err).Msg("Retry After: " + fmt.Sprint(retryAfter))
 			sleep = time.Duration(retryAfter) * time.Second
