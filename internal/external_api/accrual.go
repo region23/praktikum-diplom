@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/region23/praktikum-diplom/internal/my_errors"
+	my_errors "github.com/region23/praktikum-diplom/internal/errors"
 	"github.com/region23/praktikum-diplom/internal/storage"
 )
 

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/region23/praktikum-diplom/internal/my_errors"
+	my_errors "github.com/region23/praktikum-diplom/internal/errors"
 	"github.com/rs/zerolog/log"
 )
 
