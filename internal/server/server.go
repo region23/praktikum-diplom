@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joeljunstrom/go-luhn"
+	my_errors "github.com/region23/praktikum-diplom/internal/errors"
 	"github.com/region23/praktikum-diplom/internal/storage"
 	"github.com/rs/zerolog/log"
 )
@@ -26,11 +27,10 @@ type Server struct {
 	TokenAuth *jwtauth.JWTAuth
 }
 
-func New(storage storage.Database, dbpool *pgxpool.Pool, tokenAuth *jwtauth.JWTAuth) *Server {
+func New(storage storage.Database, tokenAuth *jwtauth.JWTAuth) *Server {
 	return &Server{
 		storage:   storage,
 		Router:    chi.NewRouter(),
-		DBPool:    dbpool,
 		TokenAuth: tokenAuth,
 	}
 }
@@ -307,13 +307,23 @@ func (s *Server) getUserBalance(w http.ResponseWriter, r *http.Request) {
 
 	currentLogin, _ := claims["user_id"].(string)
 
-	balance, err := s.storage.CurrentBalance(currentLogin)
+	tx, err := s.DBPool.Begin(s.storage.Ctx)
+	if err != nil {
+		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
+		JSONResponse(w, respBody, http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(s.storage.Ctx)
+
+	balance, err := s.storage.CurrentBalance(tx, currentLogin)
 
 	if err != nil {
 		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
 		JSONResponse(w, respBody, http.StatusInternalServerError)
 		return
 	}
+
+	tx.Commit(s.storage.Ctx)
 
 	JSONResponse(w, balance, http.StatusOK)
 }
@@ -349,7 +359,7 @@ func (s *Server) userBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 	err = s.storage.AddWithdraw(withdraw.Order, currentLogin, withdraw.Sum)
 
 	if err != nil {
-		if err == storage.ErrInsufficientBalance {
+		if err == my_errors.ErrInsufficientBalance {
 			respBody := ResponseBody{Error: err.Error()}
 			JSONResponse(w, respBody, http.StatusPaymentRequired)
 			return

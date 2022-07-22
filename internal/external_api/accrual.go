@@ -1,13 +1,16 @@
 package externalapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 
+	my_errors "github.com/region23/praktikum-diplom/internal/errors"
 	"github.com/region23/praktikum-diplom/internal/storage"
 )
 
@@ -18,20 +21,19 @@ type AccuralType struct {
 }
 
 // получение информации о расчёте начислений баллов лояльности
-func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralType, retryAfter int, err error) {
+func getOrderAccrual(ctx context.Context, httpClient *http.Client, accrualSystemAddress, number string) (accuralType *AccuralType, err error) {
 	url := accrualSystemAddress + "/api/orders/" + number
 
-	request, err := http.NewRequest(http.MethodGet, url, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	request.Header.Set("Content-Type", "application/json")
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	client := &http.Client{Timeout: 1 * time.Second}
 	// отправляем запрос
-	response, err := client.Do(request)
+	response, err := httpClient.Do(request)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	defer response.Body.Close()
@@ -41,10 +43,10 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 		var accuralType AccuralType
 		err := json.NewDecoder(response.Body).Decode(&accuralType)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 
-		return &accuralType, 0, nil
+		return &accuralType, nil
 	}
 
 	// превышено количество запросов к сервису
@@ -52,30 +54,31 @@ func getOrderAccrual(accrualSystemAddress, number string) (accuralType *AccuralT
 		retryAfter := response.Header.Get("Retry-After")
 		body, err := io.ReadAll(response.Body)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 
 		if s, err := strconv.Atoi(retryAfter); err == nil {
-			return nil, s, errors.New(string(body))
+			retryError := my_errors.RetryAfterError{RetryAfter: time.Duration(s), Err: errors.New(string(body))}
+			return nil, &retryError
 		}
 	}
 
 	// внутренняя ошибка сервера
 	if response.StatusCode == http.StatusInternalServerError {
-		return nil, 0, storage.ErrInternalServerError
+		return nil, my_errors.ErrInternalServerError
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	return nil, 0, errors.New(string(body))
+	return nil, errors.New(fmt.Sprintf("Код ответа: %v. Чё вообще происходит: %v", response.StatusCode, body))
 
 }
 
 // Обновлений начислений и статусов начислений по заказам
-func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) error {
+func UpdateAccurals(ctx context.Context, httpClient *http.Client, storage *storage.Database, accrualSystemAddress string) error {
 	// получаем список всех заказов со статусами NEW, REGISTERED, PROCESSING
 	orders, err := storage.GetOrdersForUpdate()
 	if err != nil {
@@ -87,10 +90,13 @@ func UpdateAccurals(storage *storage.Database, accrualSystemAddress string) erro
 	for _, order := range *orders {
 		time.Sleep(sleep)
 
-		accural, retryAfter, err := getOrderAccrual(accrualSystemAddress, order.Number)
-		if err != nil && retryAfter > 0 {
-			sleep = time.Duration(retryAfter) * time.Second
-			continue
+		accural, err := getOrderAccrual(ctx, httpClient, accrualSystemAddress, order.Number)
+		if err != nil {
+			retryAfter := new(my_errors.RetryAfterError)
+			if errors.As(err, &retryAfter) {
+				sleep = retryAfter.RetryAfter * time.Second
+				continue
+			}
 		}
 
 		if err != nil {

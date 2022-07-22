@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"context"
-
 	"github.com/rs/zerolog/log"
 
 	"github.com/jackc/pgx/v4"
@@ -18,11 +16,11 @@ type User struct {
 func (storage *Database) UserExist(login, hashedPassword string) (bool, error) {
 	var row pgx.Row
 	if hashedPassword != "" {
-		row = storage.dbpool.QueryRow(context.Background(),
+		row = storage.dbpool.QueryRow(storage.Ctx,
 			`SELECT count(*) FROM users WHERE login = $1 AND password = $2`,
 			login, hashedPassword)
 	} else {
-		row = storage.dbpool.QueryRow(context.Background(),
+		row = storage.dbpool.QueryRow(storage.Ctx,
 			`SELECT count(*) FROM users WHERE login = $1`,
 			login)
 	}
@@ -49,7 +47,7 @@ func (storage *Database) UserExist(login, hashedPassword string) (bool, error) {
 
 // извлекает пользователя из базы
 func (storage *Database) GetUser(login string) (*User, error) {
-	row := storage.dbpool.QueryRow(context.Background(),
+	row := storage.dbpool.QueryRow(storage.Ctx,
 		`SELECT id, login, password FROM users WHERE login = $1`,
 		login)
 
@@ -70,7 +68,7 @@ func (storage *Database) GetUser(login string) (*User, error) {
 
 // добавляет пользователя в базу
 func (storage *Database) AddUser(user *User) error {
-	_, err := storage.dbpool.Exec(context.Background(),
+	_, err := storage.dbpool.Exec(storage.Ctx,
 		`INSERT INTO users (login, password) VALUES ($1, $2);`,
 		user.Login,
 		user.Password)

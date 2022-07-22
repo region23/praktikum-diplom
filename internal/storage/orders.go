@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -19,7 +18,7 @@ type Order struct {
 
 // Добавляем новый заказ в базу
 func (storage *Database) AddOrder(orderNumber, login, status string) error {
-	_, err := storage.dbpool.Exec(context.Background(),
+	_, err := storage.dbpool.Exec(storage.Ctx,
 		`INSERT INTO orders (number, login, status) VALUES ($1, $2, $3);`,
 		orderNumber,
 		login,
@@ -34,7 +33,7 @@ func (storage *Database) AddOrder(orderNumber, login, status string) error {
 }
 
 func (storage *Database) UpdateOrder(orderNumber string, status string, accrual float64) error {
-	_, err := storage.dbpool.Exec(context.Background(),
+	_, err := storage.dbpool.Exec(storage.Ctx,
 		`UPDATE orders SET status = $1, accrual = $2 WHERE number = $3;`,
 		status,
 		accrual,
@@ -50,7 +49,7 @@ func (storage *Database) UpdateOrder(orderNumber string, status string, accrual 
 
 // извлекает заказ из базы
 func (storage *Database) GetOrder(orderNumber string) (*Order, error) {
-	row := storage.dbpool.QueryRow(context.Background(),
+	row := storage.dbpool.QueryRow(storage.Ctx,
 		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE number = $1`,
 		orderNumber)
 
@@ -70,7 +69,7 @@ func (storage *Database) GetOrder(orderNumber string) (*Order, error) {
 
 // извлекает все заказы пользователя из базы
 func (storage *Database) GetOrders(login string) (*[]Order, error) {
-	rows, err := storage.dbpool.Query(context.Background(),
+	rows, err := storage.dbpool.Query(storage.Ctx,
 		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE login = $1 ORDER BY uploaded_at ASC`,
 		login)
 
@@ -94,7 +93,7 @@ func (storage *Database) GetOrders(login string) (*[]Order, error) {
 
 // извлекает все заказы всех пользователей из базы, требующие обновление статуса и начислений
 func (storage *Database) GetOrdersForUpdate() (*[]Order, error) {
-	rows, err := storage.dbpool.Query(context.Background(),
+	rows, err := storage.dbpool.Query(storage.Ctx,
 		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE status IN ('NEW', 'REGISTERED', 'PROCESSING') ORDER BY uploaded_at ASC`)
 
 	if err != nil {

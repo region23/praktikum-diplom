@@ -3,26 +3,20 @@ package storage
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-var (
-	ErrNotFound            = errors.New("not found")
-	ErrAlreadyExists       = errors.New("already exists")
-	ErrInsufficientBalance = errors.New("сумма списания больше текущей суммы")
-	ErrInternalServerError = errors.New("InternalServerError")
-)
-
 type Database struct {
 	dbpool *pgxpool.Pool
+	Ctx    context.Context
 }
 
-func NewDatabase(dbpool *pgxpool.Pool) *Database {
+func NewDatabase(ctx context.Context, dbpool *pgxpool.Pool) *Database {
 	return &Database{
+		Ctx:    ctx,
 		dbpool: dbpool,
 	}
 }
@@ -43,7 +37,7 @@ func Ping(dbpool *pgxpool.Pool) error {
 
 // При инициализации базы данных проверить, есть ли таблица metrics.
 // Если её нет, то создать.
-func InitDB(dbpool *pgxpool.Pool) error {
+func InitDB(ctx context.Context, dbpool *pgxpool.Pool) error {
 	query := `CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
 		login VARCHAR(100) NOT NULL UNIQUE,
@@ -64,9 +58,6 @@ func InitDB(dbpool *pgxpool.Pool) error {
 		sum NUMERIC NOT NULL,
 		processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	  );`
-
-	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelfunc()
 
 	_, err := dbpool.Exec(ctx, query)
 	if err != nil {

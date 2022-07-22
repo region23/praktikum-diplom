@@ -1,9 +1,10 @@
 package storage
 
 import (
-	"context"
 	"time"
 
+	"github.com/jackc/pgx/v4"
+	my_errors "github.com/region23/praktikum-diplom/internal/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,9 +20,9 @@ type Balance struct {
 }
 
 // Получение текущего баланса пользователя
-func (storage *Database) CurrentBalance(login string) (*Balance, error) {
+func (storage *Database) CurrentBalance(tx pgx.Tx, login string) (*Balance, error) {
 	// получить общее количество баллов лояльности, накопленных за весь период
-	row := storage.dbpool.QueryRow(context.Background(),
+	row := tx.QueryRow(storage.Ctx,
 		`SELECT COALESCE(SUM(accrual), 0) as sum FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
 		login)
 
@@ -33,7 +34,7 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	}
 
 	// сумма использованных за весь период регистрации баллов
-	row2 := storage.dbpool.QueryRow(context.Background(),
+	row2 := tx.QueryRow(storage.Ctx,
 		`SELECT COALESCE(SUM(sum), 0) as sum FROM withdrawals WHERE login = $1`,
 		login)
 
@@ -55,19 +56,24 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 // sum - сумма списания в рублях
 func (storage *Database) AddWithdraw(orderNumber string, login string, sum float64) error {
 	// начать транзакцию
+	tx, err := storage.dbpool.Begin(storage.Ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(storage.Ctx)
 	// считать текущий баланс пользователя
-	balance, err := storage.CurrentBalance(login)
+	balance, err := storage.CurrentBalance(tx, login)
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to get current balance from DB")
 		return err
 	}
 
 	if sum >= balance.Current {
-		return ErrInsufficientBalance
+		return my_errors.ErrInsufficientBalance
 	}
 
 	// если баланса хватает для текущего списания - делаем списание
-	_, err = storage.dbpool.Exec(context.Background(),
+	_, err = tx.Exec(storage.Ctx,
 		`INSERT INTO withdrawals (order_number, login, sum) VALUES ($1, $2, $3);`,
 		orderNumber,
 		login,
@@ -78,11 +84,13 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 		return err
 	}
 
+	tx.Commit(storage.Ctx)
+
 	return nil
 }
 
 func (storage *Database) GetWithdrawals(login string) (*[]Withdraw, error) {
-	rows, err := storage.dbpool.Query(context.Background(),
+	rows, err := storage.dbpool.Query(storage.Ctx,
 		`SELECT order_number, sum, processed_at FROM withdrawals WHERE login = $1 ORDER BY processed_at ASC`,
 		login)
 

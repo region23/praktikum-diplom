@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"net/http"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var dbpool *pgxpool.Pool
 var tokenAuth *jwtauth.JWTAuth
 
 type Config struct {
@@ -37,53 +37,94 @@ func init() {
 	tokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
 }
 
+func createChannel() (chan os.Signal, func()) {
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	return stopCh, func() {
+		close(stopCh)
+	}
+}
+
+func start(server *http.Server) {
+	log.Info().Msg("application started")
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		panic(err)
+	} else {
+		log.Info().Msg("application stopped gracefully")
+	}
+}
+
+func shutdown(ctx context.Context, cancel context.CancelFunc, server *http.Server) {
+	if err := server.Shutdown(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		panic(err)
+	} else {
+		log.Info().Msg("application shutdowned")
+	}
+}
+
 func main() {
+	var dbpool *pgxpool.Pool
+
 	flag.Parse()
 
 	if err := env.Parse(&cfg); err != nil {
 		log.Error().Err(err).Msgf("%+v\n", err)
 	}
 
-	osSigChan := make(chan os.Signal, 1)
-	signal.Notify(osSigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
 	var repository *storage.Database
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	// Инициализируем подключение к базе данных
 	var err error
-	dbpool, err = pgxpool.Connect(context.Background(), cfg.DatabaseURI)
+	dbpool, err = pgxpool.Connect(ctx, cfg.DatabaseURI)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Не смогли подключиться к базе данных")
 	}
 
-	err = storage.InitDB(dbpool)
+	err = storage.InitDB(ctx, dbpool)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Не смогли подключиться к базе данных")
 	}
 
 	defer dbpool.Close()
 
-	go func() {
+	repository = storage.NewDatabase(ctx, dbpool)
+
+	srv := server.New(*repository, tokenAuth)
+	srv.MountHandlers()
+
+	httpServer := &http.Server{Addr: cfg.RunAddress, Handler: srv.Router}
+	go start(httpServer)
+
+	stopCh, closeCh := createChannel()
+	defer closeCh()
+
+	httpClient := http.Client{Timeout: 5 * time.Second}
+
+	go func(ctx context.Context, httpClient *http.Client) {
+	updateAccuralsBlock:
 		for {
 			select {
-			case <-osSigChan:
-				os.Exit(0)
+			case <-stopCh:
+				log.Info().Msg("завершили UpdateAccurals")
+				break updateAccuralsBlock
 			default:
-				err = externalapi.UpdateAccurals(repository, cfg.AccrualSystemAddress)
+				err = externalapi.UpdateAccurals(ctx, httpClient, repository, cfg.AccrualSystemAddress)
 				if err != nil {
-					log.Debug().Err(err).Msg("При доступе к внешнему сервису произошла ошибка")
-					time.Sleep(1 * time.Second)
+					if errors.Is(err, context.DeadlineExceeded) {
+						log.Debug().Err(err).Msg("Внешний сервис не доступен")
+						time.Sleep(10 * time.Second)
+					} else {
+						log.Debug().Err(err).Msg("При доступе к внешнему сервису произошла ошибка")
+					}
 				}
 			}
 		}
-	}()
+	}(ctx, &httpClient)
 
-	repository = storage.NewDatabase(dbpool)
+	log.Info().Msgf("notified: %v", <-stopCh)
 
-	log.Debug().Msg("Starting server...")
-
-	srv := server.New(*repository, dbpool, tokenAuth)
-	srv.MountHandlers()
-
-	http.ListenAndServe(cfg.RunAddress, srv.Router)
+	shutdown(ctx, cancel, httpServer)
 }
