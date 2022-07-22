@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	my_errors "github.com/region23/praktikum-diplom/internal/errors"
+	"github.com/region23/praktikum-diplom/internal/my_errors"
 	"github.com/region23/praktikum-diplom/internal/storage"
 )
 
@@ -73,7 +73,7 @@ func getOrderAccrual(ctx context.Context, httpClient *http.Client, accrualSystem
 		return nil, err
 	}
 
-	return nil, errors.New(fmt.Sprintf("Код ответа: %v. Чё вообще происходит: %v", response.StatusCode, body))
+	return nil, fmt.Errorf("Код ответа: %v. Чё вообще происходит: %v", response.StatusCode, body)
 
 }
 

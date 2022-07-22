@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joeljunstrom/go-luhn"
-	my_errors "github.com/region23/praktikum-diplom/internal/errors"
+	"github.com/region23/praktikum-diplom/internal/my_errors"
 	"github.com/region23/praktikum-diplom/internal/storage"
 	"github.com/rs/zerolog/log"
 )
