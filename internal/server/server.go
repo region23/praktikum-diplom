@@ -307,23 +307,13 @@ func (s *Server) getUserBalance(w http.ResponseWriter, r *http.Request) {
 
 	currentLogin, _ := claims["user_id"].(string)
 
-	tx, err := s.DBPool.Begin(s.storage.Ctx)
-	if err != nil {
-		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
-		JSONResponse(w, respBody, http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback(s.storage.Ctx)
-
-	balance, err := s.storage.CurrentBalance(tx, currentLogin)
+	balance, err := s.storage.CurrentBalance(currentLogin)
 
 	if err != nil {
 		respBody := ResponseBody{Error: fmt.Sprintf("внутренняя ошибка сервера: %v", err.Error())}
 		JSONResponse(w, respBody, http.StatusInternalServerError)
 		return
 	}
-
-	tx.Commit(s.storage.Ctx)
 
 	JSONResponse(w, balance, http.StatusOK)
 }
