@@ -23,8 +23,8 @@ type Balance struct {
 func (storage *Database) currentBalance(tx pgx.Tx, login string) (*Balance, error) {
 	// получить общее количество баллов лояльности, накопленных за весь период
 	row := tx.QueryRow(storage.Ctx,
-		`SELECT COALESCE(SUM(accrual), 0) as sum FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
-		login)
+		`SELECT COALESCE(SUM(accrual), 0) as sum FROM orders WHERE login = $1 AND status = $2`,
+		login, StatusProcessed)
 
 	var totalaccruals float64
 

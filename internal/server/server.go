@@ -240,7 +240,7 @@ func (s *Server) postUserOrders(w http.ResponseWriter, r *http.Request) {
 
 		// Такой номер заказа не найден - можно добавить новый
 		if err == pgx.ErrNoRows {
-			err := s.storage.AddOrder(string(orderNumber), currentLogin, "NEW")
+			err := s.storage.AddOrder(string(orderNumber), currentLogin, storage.StatusNew)
 			if err != nil {
 				respBody := ResponseBody{Error: fmt.Sprintf("при загрузке заказа произошла ошибка: %v", err.Error())}
 				JSONResponse(w, respBody, http.StatusInternalServerError)

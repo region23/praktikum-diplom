@@ -8,16 +8,25 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
+type OrderStatus string
+
+const (
+	StatusRegistered OrderStatus = "REGISTERED"
+	StatusNew        OrderStatus = "NEW"
+	StatusProcessing OrderStatus = "PROCESSING"
+	StatusProcessed  OrderStatus = "PROCESSED"
+)
+
 type Order struct {
-	Number     string    `json:"number"`            // номер заказа
-	Login      string    `json:"login"`             // логин пользователя, оформившего заказ
-	Status     string    `json:"status"`            // статус обработки расчётов
-	Accrual    float64   `json:"accrual,omitempty"` // количество начисленных за заказ баллов
-	UploadedAt time.Time `json:"uploaded_at"`       // время загрузки
+	Number     string      `json:"number"`            // номер заказа
+	Login      string      `json:"login"`             // логин пользователя, оформившего заказ
+	Status     OrderStatus `json:"status"`            // статус обработки расчётов
+	Accrual    float64     `json:"accrual,omitempty"` // количество начисленных за заказ баллов
+	UploadedAt time.Time   `json:"uploaded_at"`       // время загрузки
 }
 
 // Добавляем новый заказ в базу
-func (storage *Database) AddOrder(orderNumber, login, status string) error {
+func (storage *Database) AddOrder(orderNumber string, login string, status OrderStatus) error {
 	_, err := storage.dbpool.Exec(storage.Ctx,
 		`INSERT INTO orders (number, login, status) VALUES ($1, $2, $3);`,
 		orderNumber,
@@ -32,7 +41,7 @@ func (storage *Database) AddOrder(orderNumber, login, status string) error {
 	return nil
 }
 
-func (storage *Database) UpdateOrder(orderNumber string, status string, accrual float64) error {
+func (storage *Database) UpdateOrder(orderNumber string, status OrderStatus, accrual float64) error {
 	_, err := storage.dbpool.Exec(storage.Ctx,
 		`UPDATE orders SET status = $1, accrual = $2 WHERE number = $3;`,
 		status,
@@ -94,7 +103,7 @@ func (storage *Database) GetOrders(login string) (*[]Order, error) {
 // извлекает все заказы всех пользователей из базы, требующие обновление статуса и начислений
 func (storage *Database) GetOrdersForUpdate() (*[]Order, error) {
 	rows, err := storage.dbpool.Query(storage.Ctx,
-		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE status IN ('NEW', 'REGISTERED', 'PROCESSING') ORDER BY uploaded_at ASC`)
+		`SELECT number, login, status, accrual, uploaded_at FROM orders WHERE status IN ($1, $2, $3) ORDER BY uploaded_at ASC`, StatusNew, StatusProcessing, StatusRegistered)
 
 	if err != nil {
 		return nil, err
