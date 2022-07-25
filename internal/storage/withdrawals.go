@@ -62,9 +62,9 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	balance, err := storage.currentBalance(tx, login)
 	if err != nil {
 		wrapped := fmt.Errorf("[functionName] error when getting current balance: %w", err)
-		err_rlbck := tx.Rollback(storage.Ctx)
-		if err_rlbck != nil {
-			log.Error().Err(err_rlbck).Msg("[functionName] error when rollback transaction in current balance")
+		errRlbck := tx.Rollback(storage.Ctx)
+		if errRlbck != nil {
+			log.Error().Err(errRlbck).Msg("[functionName] error when rollback transaction in current balance")
 		}
 
 		return nil, wrapped
@@ -104,9 +104,9 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to INSERT withdraw to DB")
 		wrapped := fmt.Errorf("[functionName] error when getting current balance: %w", err)
-		err_rlbck := tx.Rollback(storage.Ctx)
-		if err_rlbck != nil {
-			log.Error().Err(err_rlbck).Msg("[functionName] error when rollback transaction in current balance")
+		errRlbck := tx.Rollback(storage.Ctx)
+		if errRlbck != nil {
+			log.Error().Err(errRlbck).Msg("[functionName] error when rollback transaction in current balance")
 		}
 		return wrapped
 	}
