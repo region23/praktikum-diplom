@@ -23,6 +23,3 @@ git fetch template && git checkout template/master .github
 ```
 
 Затем добавьте полученные изменения в свой репозиторий.
-
-
-`go run cmd/gophermart/main.go -a "localhost:8080" -d "postgres://postgres:postgres@localhost:5432/gophermart"`
