@@ -97,10 +97,13 @@ func UpdateAccurals(ctx context.Context, httpClient *http.Client, storage *stora
 				sleep = retryAfter.RetryAfter * time.Second
 				continue
 			}
+
+			return err
 		}
 
-		if err != nil {
-			return err
+		// обновлять не нужно - пропускаем этот заказ
+		if order.Status == accural.Status {
+			continue
 		}
 
 		// обновляем данные по заказу в orders
