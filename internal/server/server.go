@@ -130,7 +130,11 @@ func (s *Server) userRegister(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
-	json.NewEncoder(w).Encode(nil)
+	err = json.NewEncoder(w).Encode(nil)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка при преобразовании данных в json: %v", err.Error()), http.StatusInternalServerError)
+		return
+	}
 
 }
 
@@ -185,7 +189,11 @@ func (s *Server) userLogin(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
-	json.NewEncoder(w).Encode(nil)
+	err = json.NewEncoder(w).Encode(nil)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка при преобразовании данных в json: %v", err.Error()), http.StatusInternalServerError)
+		return
+	}
 }
 
 // загрузка пользователем номера заказа для расчёта
@@ -402,5 +410,9 @@ func JSONResponse(w http.ResponseWriter, responseStruct interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(responseStruct)
+	err := json.NewEncoder(w).Encode(responseStruct)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка при преобразовании данных в json: %v", err.Error()), http.StatusInternalServerError)
+		return
+	}
 }

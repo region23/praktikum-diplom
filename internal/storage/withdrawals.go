@@ -3,6 +3,7 @@ package storage
 import (
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	my_errors "github.com/region23/praktikum-diplom/internal/errors"
 	"github.com/rs/zerolog/log"
 )
@@ -18,10 +19,9 @@ type Balance struct {
 	Withdrawn float64 `json:"withdrawn"` // сумма использованных за весь период регистрации баллов
 }
 
-// Получение текущего баланса пользователя
-func (storage *Database) CurrentBalance(login string) (*Balance, error) {
+func (storage *Database) currentBalance(tx pgx.Tx, login string) (*Balance, error) {
 	// получить общее количество баллов лояльности, накопленных за весь период
-	row := storage.dbpool.QueryRow(storage.Ctx,
+	row := tx.QueryRow(storage.Ctx,
 		`SELECT COALESCE(SUM(accrual), 0) as sum FROM orders WHERE login = $1 AND status = 'PROCESSED'`,
 		login)
 
@@ -33,7 +33,7 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	}
 
 	// сумма использованных за весь период регистрации баллов
-	row2 := storage.dbpool.QueryRow(storage.Ctx,
+	row2 := tx.QueryRow(storage.Ctx,
 		`SELECT COALESCE(SUM(sum), 0) as sum FROM withdrawals WHERE login = $1`,
 		login)
 
@@ -51,6 +51,21 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	return &balance, nil
 }
 
+// Получение текущего баланса пользователя
+func (storage *Database) CurrentBalance(login string) (*Balance, error) {
+	tx, err := storage.dbpool.Begin(storage.Ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(storage.Ctx)
+	balance, err := storage.currentBalance(tx, login)
+	if err != nil {
+		return nil, err
+	}
+
+	return balance, tx.Commit(storage.Ctx)
+}
+
 // Добавляем новое списание баллов
 // sum - сумма списания в рублях
 func (storage *Database) AddWithdraw(orderNumber string, login string, sum float64) error {
@@ -62,7 +77,7 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 	defer tx.Rollback(storage.Ctx)
 	// считать текущий баланс пользователя
 	// не понимаю как этот метод обернуть в транзакцию - он используется в нескольких местах
-	balance, err := storage.CurrentBalance(login)
+	balance, err := storage.currentBalance(tx, login)
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to get current balance from DB")
 		return err
@@ -84,9 +99,7 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 		return err
 	}
 
-	tx.Commit(storage.Ctx)
-
-	return nil
+	return tx.Commit(storage.Ctx)
 }
 
 func (storage *Database) GetWithdrawals(login string) (*[]Withdraw, error) {
