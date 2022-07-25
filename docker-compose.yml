@@ -1,0 +1,18 @@
+version: "3.7"
+
+services:
+  postgres:
+    restart: unless-stopped
+    image: postgres:14 
+    container_name: praktikum
+    environment:
+      - POSTGRES_DB=gophermart
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data:rw
+
+volumes:
+  pgdata:
