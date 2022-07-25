@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -57,10 +58,16 @@ func (storage *Database) CurrentBalance(login string) (*Balance, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(storage.Ctx)
+	//defer tx.Rollback(storage.Ctx)
 	balance, err := storage.currentBalance(tx, login)
 	if err != nil {
-		return nil, err
+		wrapped := fmt.Errorf("[functionName] error when getting current balance: %w", err)
+		err_rlbck := tx.Rollback(storage.Ctx)
+		if err_rlbck != nil {
+			log.Error().Err(err_rlbck).Msg("[functionName] error when rollback transaction in current balance")
+		}
+
+		return nil, wrapped
 	}
 
 	return balance, tx.Commit(storage.Ctx)
@@ -74,7 +81,7 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(storage.Ctx)
+	//defer tx.Rollback(storage.Ctx)
 	// считать текущий баланс пользователя
 	// не понимаю как этот метод обернуть в транзакцию - он используется в нескольких местах
 	balance, err := storage.currentBalance(tx, login)
@@ -96,7 +103,12 @@ func (storage *Database) AddWithdraw(orderNumber string, login string, sum float
 
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to INSERT withdraw to DB")
-		return err
+		wrapped := fmt.Errorf("[functionName] error when getting current balance: %w", err)
+		err_rlbck := tx.Rollback(storage.Ctx)
+		if err_rlbck != nil {
+			log.Error().Err(err_rlbck).Msg("[functionName] error when rollback transaction in current balance")
+		}
+		return wrapped
 	}
 
 	return tx.Commit(storage.Ctx)
